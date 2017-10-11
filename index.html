@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>
+        * {
+            padding: 0;
+            margin: 0;
+        }
+
+        html {
+            -ms-touch-action: none;
+        }
+
+        #stage {
+            width: 300px;
+            height: 450px;
+            background: #ccc;
+            margin: 80px auto;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        ul {
+            height: 20000px;
+            background: url(./test.jpg) center top;
+            background-size: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="stage">
+        <ul></ul>
+    </div>
+    <script>
+        document.addEventListener("touchmove", function (e) {
+            e && e.preventDefault()
+        }, {
+            capture: false,
+            passive: false
+        });
+    </script>
+    <script src="./utils.js"></script>
+    <script src="./index.js"></script>
+    <script>
+        var S = new MScroll('#stage')
+    </script>
+</body>
+
+</html>
