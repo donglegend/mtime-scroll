@@ -5,9 +5,8 @@ var MScroll = (function () {
         this.scrollerStyle = this.scroller.style;
 
         this.options = {
-            disablePointer: !utils.hasPointer,
-            disableTouch: utils.hasPointer || !utils.hasTouch,
-            disableMouse: utils.hasPointer || utils.hasTouch,
+            disableTouch: !utils.hasTouch,
+            disableMouse: utils.hasTouch,
 
             // 那个方向滚动
             scrollX: false,
@@ -20,15 +19,27 @@ var MScroll = (function () {
             bounceTime: 600,
             bounceEasing: '',
 
+            // 为了增加下拉刷新功能，增加一个距离
+            topOffset: 0,
+
+            // 阻力系数，到达临界点 拖动阻力
+            dragForce: 3,
+
             // 启用css3 过度
             useTransition: true,
             useTransform: true,
 
+            resizePolling: 60,
+
             // 事件监听对象
             bindToWrapper: typeof window.onmousedown === "undefined"
         }
+        for (var i in options) {
+            this.options[i] = options[i];
+        }
+
         // 3d加速
-        this.translateZ = ' translateZ(0)';
+        this.translateZ = utils.hasPerspective ? ' translateZ(0)' : '';
         this.options.useTransition = utils.hasTransition && this.options.useTransition;
         this.options.useTransform = utils.hasTransform && this.options.useTransform;
 
@@ -43,6 +54,8 @@ var MScroll = (function () {
 
         this._init();
         this.refresh();
+        // 还没有什么用到的地方，留作 滑动开关控制
+        this.enable();
     }
     return MScroll
 })();
@@ -52,10 +65,14 @@ MScroll.prototype = {
         this._initEvents()
     },
     _start: function (e) {
+        // if (!this.enabled) {
+        //     return;
+        // }
         if (this.initiated && utils.eventType[e.type] !== this.initiated) {
             return;
         }
         e && e.preventDefault();
+        e && e.stopPropagation();
         // 计算偏移量
         this.distX = 0;
         this.distY = 0;
@@ -64,7 +81,9 @@ MScroll.prototype = {
 
         var point = e.touches ? e.touches[0] : e;
 
+        // 开启滑动开关
         this.initiated = utils.eventType[e.type];
+        this.moved = false;
 
         // 如果正在进行过渡动画，再次触摸，停止动画
         if (this.options.useTransition && this.isInTransition) {
@@ -72,7 +91,7 @@ MScroll.prototype = {
             this.isInTransition = false;
             pos = this.getComputedPosition();
             this._translate(Math.round(pos.x), Math.round(pos.y));
-            // this._execEvent('scrollEnd');
+            this._fire('scrollEnd');
         }
 
         // 初始 transform 偏移量
@@ -83,12 +102,16 @@ MScroll.prototype = {
         this.pointY = point.pageY;
     },
     _move: function (e) {
+        // if (!this.enabled) {
+        //     return;
+        // }
         // _start 里初始化 类型，不一致不做任何操作，_end里会清空
         if (utils.eventType[e.type] !== this.initiated) {
             return;
         }
         // 阻止默认事件
         e && e.preventDefault();
+        e && e.stopPropagation();
         var point = e.touches ? e.touches[0] : e,
             deltaX = point.pageX - this.pointX,
             deltaY = point.pageY - this.pointY,
@@ -96,29 +119,45 @@ MScroll.prototype = {
             newX, newY,
             absDistX, absDistY;
 
+        // 更新 触点 坐标位置
         this.pointX = point.pageX;
         this.pointY = point.pageY;
 
         this.distX += deltaX;
         this.distY += deltaY;
 
+        absDistX = Math.abs(this.distX)
+        absDistY = Math.abs(this.distY)
+
         // 如果滑动距离太短，不做滚动操作
-        if (timestamp - this.endTime > 300 && Math.abs(this.distY) < 10) {
+        if (timestamp - this.endTime > 300 && (absDistX < 10 && absDistY < 10)) {
             return;
         }
 
         // 计算最终 偏移位置
+        if (!this.options.scrollY) {
+            deltaY = 0;
+        }
+        if (!this.options.scrollX) {
+            deltaX = 0;
+        }
         newX = this.x + deltaX;
         newY = this.y + deltaY;
 
         // 如果到达最值，做 阻力限制
-        if (newY > 0 || newY < this.maxScrollY) {
-            newY = this.options.bounce ? this.y + deltaY / 3 : newY > 0 ? 0 : this.maxScrollY;
+        if (newX > 0 || newX < this.maxScrollX) {
+            newX = this.options.bounce ? this.x + deltaX / this.options.dragForce : newX > 0 ? 0 : this.maxScrollX;
+        }
+        if (newY > this.minScrollY || newY < this.maxScrollY) {
+            newY = this.options.bounce ? this.y + deltaY / this.options.dragForce : newY > this.minScrollY ? this.minScrollY : this.maxScrollY;
         }
 
         // 开始 滚动，这里可以加入钩子函数
+        if (!this.moved) {
+            this._fire('scrollStart')
+        }
         this.moved = true;
-        this._translate(0, newY);
+        this._translate(newX, newY);
 
         // 更新 位置
         if (timestamp - this.startTime > 300) {
@@ -126,13 +165,17 @@ MScroll.prototype = {
             this.startX = this.x;
             this.startY = this.y;
         }
+        this._fire('scroll')
     },
     _end: function (e) {
+        // if (!this.enabled) {
+        //     return;
+        // }
         if (utils.eventType[e.type] !== this.initiated) {
             return;
         }
-        e.preventDefault();
-        e.stopPropagation();
+        e && e.preventDefault();
+        e && e.stopPropagation();
 
         var point = e.changedTouches ? e.changedTouches[0] : e,
             momentumX,
@@ -140,13 +183,16 @@ MScroll.prototype = {
             duration = utils.getTime() - this.startTime,
             newX = Math.round(this.x),
             newY = Math.round(this.y),
+            // 最后的大约300ms以内 滑动的距离
             distanceX = Math.abs(newX - this.startX),
             distanceY = Math.abs(newY - this.startY),
             time = 0,
             easing = '';
 
+        // 过渡开关
         this.isInTransition = 0;
 
+        // 关闭滑动开关
         this.initiated = 0;
 
         this.endTime = utils.getTime();
@@ -155,28 +201,37 @@ MScroll.prototype = {
         if (this.resetPosition()) {
             return;
         }
-        // 先滑动到 最后离开屏幕的那个触点 坐标
+        // 先定位到 保存的 坐标位置,然后启动惯性系统
         this.scrollTo(newX, newY);
 
         // 计算 惯性动量
         if (this.options.momentum && duration < 300) {
-            momentumY = utils.momentum(this.y, this.startY, duration, this.maxScrollY, this.options.bounce ? this.wrapperHeight : 0, this.options.deceleration);
-            // newX = momentumX.destination;
-            console.log(momentumY)
+            momentumX = this.hasHorizontalScroll ? utils.momentum(this.x, this.startX, duration, this.maxScrollX, this.options.bounce ? this.wrapperWidth : 0, this.options.deceleration) : {
+                destination: newX,
+                duration: 0
+            };
+            // 说明： 如果缓冲计算位置 比 最新minScrollY 小，会发生什么情况，需要测试
+            // 理论上 缓冲计算位置 应该比 最小minScrollY || 0 要大
+            momentumY = this.hasVerticalScroll ? utils.momentum(this.y, this.startY, duration, this.maxScrollY, this.options.bounce ? this.wrapperHeight : 0, this.options.deceleration) : {
+                destination: newY,
+                duration: 0
+            };
+            newX = momentumX.destination;
             newY = momentumY.destination;
-            time = momentumY.duration;
-            // time = Math.max(momentumX.duration, momentumY.duration);
+            time = Math.max(momentumX.duration, momentumY.duration);
+            // 开启过渡
             this.isInTransition = 1;
         }
 
-        if (newY != this.y) {
-            // change easing function when scroller goes out of the boundaries
-            if (newY > 0 || newY < this.maxScrollY) {
+        if (newX != this.x || newY != this.y) {
+            // 启动反弹效果
+            if (newX > 0 || newX < this.maxScrollX || newY > 0 || newY < this.maxScrollY) {
                 easing = utils.ease.quadratic;
             }
             this.scrollTo(newX, newY, time, easing);
             return;
         }
+        this._fire('scrollEnd');
     },
     _transitionEnd: function (e) {
         if (e.target != this.scroller || !this.isInTransition) {
@@ -185,11 +240,15 @@ MScroll.prototype = {
         this._transitionTime();
         if (!this.resetPosition(this.options.bounceTime)) {
             this.isInTransition = false;
-            // this._execEvent('scrollEnd');
+            this._fire('scrollEnd');
         }
     },
     _resize: function () {
-        console.log('resize')
+        var that = this;
+        clearTimeout(this.resizeTimeout);
+        this.resizeTimeout = setTimeout(function () {
+            that.refresh();
+        }, this.options.resizePolling);
     },
     // 是否到达临界点，重置位置
     resetPosition: function () {
@@ -197,17 +256,20 @@ MScroll.prototype = {
             y = this.y;
 
         var time = this.options.bounceTime || 0;
-
-        if (this.y > 0) {
-            y = 0;
+        if (!this.hasHorizontalScroll || this.x > 0) {
+            x = 0;
+        } else if (this.x < this.maxScrollX) {
+            x = this.maxScrollX;
+        }
+        if (!this.hasVerticalScroll || this.y > this.minScrollY) {
+            y = this.minScrollY;
         } else if (this.y < this.maxScrollY) {
             y = this.maxScrollY;
         }
-
+        console.log(x, y)
         if (x == this.x && y == this.y) {
             return false;
         }
-
         this.scrollTo(x, y, time, this.options.bounceEasing);
         return true;
     },
@@ -216,21 +278,11 @@ MScroll.prototype = {
 
         this.isInTransition = this.options.useTransition && time > 0;
         var transitionType = this.options.useTransition && easing.style;
-
         if (transitionType) {
             this._transitionTimingFunction(easing.style);
             this._transitionTime(time);
         }
         this._translate(x, y);
-        // if (!time || transitionType) {
-        //     if (transitionType) {
-        //         this._transitionTimingFunction(easing.style);
-        //         this._transitionTime(time);
-        //     }
-        //     this._translate(x, y);
-        // } else {
-        //     this._animate(x, y, time, easing.fn);
-        // }
     },
     _transitionTime: function (time) {
         if (!this.options.useTransition) {
@@ -241,19 +293,8 @@ MScroll.prototype = {
         if (!durationProp) {
             return;
         }
-
         this.scrollerStyle[durationProp] = time + 'ms';
 
-        // if (!time && utils.isBadAndroid) {
-        //     this.scrollerStyle[durationProp] = '0.0001ms';
-        //     // remove 0.0001ms
-        //     var self = this;
-        //     rAF(function () {
-        //         if (self.scrollerStyle[durationProp] === '0.0001ms') {
-        //             self.scrollerStyle[durationProp] = '0s';
-        //         }
-        //     });
-        // }
     },
     _transitionTimingFunction: function (easing) {
         this.scrollerStyle[utils.style.transitionTimingFunction] = easing;
@@ -262,13 +303,7 @@ MScroll.prototype = {
         this.scrollerStyle[utils.style.transform] = 'translate(' + x + 'px,' + y + 'px)' + this.translateZ;
         // if (this.options.useTransform) {
         //     this.scrollerStyle[utils.style.transform] = 'translate(' + x + 'px,' + y + 'px)' + this.translateZ;
-        // } else {
-        //     x = Math.round(x);
-        //     y = Math.round(y);
-        //     this.scrollerStyle.left = x + 'px';
-        //     this.scrollerStyle.top = y + 'px';
         // }
-
         this.x = x;
         this.y = y;
     },
@@ -280,15 +315,18 @@ MScroll.prototype = {
             matrix = matrix[utils.style.transform].split(')')[0].split(', ');
             x = +(matrix[12] || matrix[4]);
             y = +(matrix[13] || matrix[5]);
-        } else {
-            x = +matrix.left.replace(/[^-\d.]/g, '');
-            y = +matrix.top.replace(/[^-\d.]/g, '');
         }
 
         return {
             x: x,
             y: y
         };
+    },
+    disable: function () {
+        this.enabled = false;
+    },
+    enable: function () {
+        this.enabled = true;
     },
     refresh: function () {
         // 重置容器
@@ -300,7 +338,9 @@ MScroll.prototype = {
         this.scrollerWidth = rect.width;
         this.scrollerHeight = rect.height;
 
-        // 重置 滚条距离
+        // 重置 滚条距离, 更改自定义 最小距
+        this.minScrollY = this.options.topOffset || 0;
+
         this.maxScrollX = this.wrapperWidth - this.scrollerWidth;
         this.maxScrollY = this.wrapperHeight - this.scrollerHeight;
 
@@ -317,7 +357,7 @@ MScroll.prototype = {
             this.maxScrollY = 0;
             this.scrollerHeight = this.wrapperHeight;
         }
-
+        this.endTime = 0;
         this.resetPosition()
     },
     // 注册自定义事件
@@ -338,7 +378,7 @@ MScroll.prototype = {
         }
     },
     // 触发自定义事件
-    fire: function (type) {
+    _fire: function (type) {
         if (!this._events[type]) {
             return;
         }
@@ -354,13 +394,9 @@ MScroll.prototype = {
     _initEvents: function (remove) {
         var eventType = remove ? utils.removeEvent : utils.addEvent,
             target = this.options.bindToWrapper ? this.wrapper : window;
-        console.log(target)
-        // eventType(window, 'orientationchange', this);
-        // eventType(window, 'resize', this);
+        eventType(window, 'orientationchange', this);
+        eventType(window, 'resize', this);
 
-        // if (this.options.click) {
-        //     eventType(this.wrapper, 'click', this, true);
-        // }
         if (!this.options.disableMouse) {
             eventType(this.wrapper, 'mousedown', this);
             eventType(target, 'mousemove', this);
@@ -374,7 +410,7 @@ MScroll.prototype = {
         //     eventType(target, utils.prefixPointerEvent('pointercancel'), this);
         //     eventType(target, utils.prefixPointerEvent('pointerup'), this);
         // }
-        if (utils.hasTouch) {
+        if (!this.options.disableTouch) {
             eventType(this.wrapper, 'touchstart', this);
             eventType(target, 'touchmove', this);
             eventType(target, 'touchcancel', this);
@@ -389,24 +425,16 @@ MScroll.prototype = {
     handleEvent: function (e) {
         switch (e.type) {
             case 'touchstart':
-            case 'pointerdown':
-            case 'MSPointerDown':
             case 'mousedown':
                 this._start(e);
                 break;
             case 'touchmove':
-                // case 'pointermove':
-                // case 'MSPointerMove':
-                // case 'mousemove':
+            case 'mousemove':
                 this._move(e);
                 break;
             case 'touchend':
-            case 'pointerup':
-            case 'MSPointerUp':
             case 'mouseup':
             case 'touchcancel':
-            case 'pointercancel':
-            case 'MSPointerCancel':
             case 'mousecancel':
                 this._end(e);
                 break;
@@ -419,20 +447,6 @@ MScroll.prototype = {
             case 'oTransitionEnd':
             case 'MSTransitionEnd':
                 this._transitionEnd(e);
-                break;
-            case 'wheel':
-            case 'DOMMouseScroll':
-            case 'mousewheel':
-                this._wheel(e);
-                break;
-            case 'keydown':
-                this._key(e);
-                break;
-            case 'click':
-                if (this.enabled && !e._constructed) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                }
                 break;
         }
     }
