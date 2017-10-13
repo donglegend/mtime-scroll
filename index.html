@@ -79,8 +79,29 @@
             overflow: hidden;
             touch-action: none;
             transition: all .3s;
-            z-index: 0;
         }
+        /* .MScrollVerticalBar {
+            position: absolute;
+            z-index: 9999;
+            width: 5px;
+            bottom: 2px;
+            top: 2px;
+            right: 1px;
+            overflow: hidden;
+        }
+
+        .indicatorBar {
+            -webkit-box-sizing: border-box;
+            -moz-box-sizing: border-box;
+            box-sizing: border-box;
+            position: absolute;
+
+            width: 100%;
+            height: 30%;
+
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 4px;
+        } */
 
         .scroll {
             background: pink;
@@ -151,7 +172,6 @@
             topOffset: -elDown.clientHeight
         })
 
-        console.dir(elDown.clientHeight)
         // myScroll.on('scrollStart', function () {
         //     clearTimeout(timer)
         // })

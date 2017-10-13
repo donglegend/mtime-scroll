@@ -1097,7 +1097,6 @@
                     indicators.push(indicator);
                 }
             }
-
             if (this.options.indicators) {
                 // TODO: check concat compatibility
                 indicators = indicators.concat(this.options.indicators);
