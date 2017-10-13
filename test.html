@@ -12,20 +12,28 @@
             height: 500px;
             background: #ccc;
             margin: 50px auto;
+            overflow: auto;
+        }
+
+        .scroll {
+            height: 20000px;
+            background: url(./test.jpg) center top;
+            background-size: 100%;
         }
     </style>
 </head>
 
 <body>
-    <div id="stage" style="transform: translate3d(0px, -20px, 30px); transition-timing-function: cubic-bezier(0.1, 0.57, 0.1, 1); transition-duration: 0ms;"></div>
+    <div id="stage" style="">
+        <div class="scroll"></div>
+    </div>
     <script>
-        var el = document.querySelector('#stage');
-        el.addEventListener('touchstart', function () {}, false)
-        el.addEventListener("touchmove", function (e) {
-            e && e.preventDefault()
-        });
-        var tempStyles = getComputedStyle(el, null)
-        console.log(tempStyles.transform.split(')')[0].split(', '))
+        // var el = document.querySelector('#stage');
+        // el.addEventListener('touchstart', function () {}, false)
+        // el.addEventListener("touchmove", function (e) {
+        //     e && e.preventDefault()
+        // });
+        // var tempStyles = getComputedStyle(el, null)
         // window.addEventListener("touchmove", function (e) {
         //     e && e.preventDefault()
         // });

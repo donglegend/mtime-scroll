@@ -53,9 +53,6 @@ var MScroll = (function () {
         this._events = {};
 
         this._init();
-        this.refresh();
-        // 还没有什么用到的地方，留作 滑动开关控制
-        this.enable();
     }
     return MScroll
 })();
@@ -63,11 +60,14 @@ MScroll.prototype = {
     version: '0.0.1',
     _init: function () {
         this._initEvents()
+        this.refresh();
+        // 还没有什么用到的地方，留作 滑动开关控制
+        this.enable();
     },
     _start: function (e) {
-        // if (!this.enabled) {
-        //     return;
-        // }
+        if (!this.enabled) {
+            return;
+        }
         if (this.initiated && utils.eventType[e.type] !== this.initiated) {
             return;
         }
@@ -102,9 +102,9 @@ MScroll.prototype = {
         this.pointY = point.pageY;
     },
     _move: function (e) {
-        // if (!this.enabled) {
-        //     return;
-        // }
+        if (!this.enabled) {
+            return;
+        }
         // _start 里初始化 类型，不一致不做任何操作，_end里会清空
         if (utils.eventType[e.type] !== this.initiated) {
             return;
@@ -168,9 +168,9 @@ MScroll.prototype = {
         this._fire('scroll')
     },
     _end: function (e) {
-        // if (!this.enabled) {
-        //     return;
-        // }
+        if (!this.enabled) {
+            return;
+        }
         if (utils.eventType[e.type] !== this.initiated) {
             return;
         }
@@ -266,7 +266,6 @@ MScroll.prototype = {
         } else if (this.y < this.maxScrollY) {
             y = this.maxScrollY;
         }
-        console.log(x, y)
         if (x == this.x && y == this.y) {
             return false;
         }
@@ -342,7 +341,7 @@ MScroll.prototype = {
         this.minScrollY = this.options.topOffset || 0;
 
         this.maxScrollX = this.wrapperWidth - this.scrollerWidth;
-        this.maxScrollY = this.wrapperHeight - this.scrollerHeight;
+        this.maxScrollY = Math.min(this.wrapperHeight - this.scrollerHeight, this.minScrollY);
 
         // 是否有滚动
         this.hasHorizontalScroll = this.options.scrollX && this.maxScrollX < 0;
