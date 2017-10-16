@@ -66,13 +66,12 @@
         constructor: MScroll,
         _init: function () {
             this._initEvents()
-            this.refresh();
-            // 还没有什么用到的地方，留作 滑动开关控制
-            this.enable();
-
             if (this.options.scrollbars) {
                 this._initIndicators();
             }
+            // 还没有什么用到的地方，留作 滑动开关控制
+            this.enable();
+            this.refresh();
         },
         _start: function (e) {
             if (!this.enabled) {
@@ -204,7 +203,6 @@
 
             // 关闭滑动开关
             this.initiated = 0;
-
             this.endTime = utils.getTime();
 
             // 判断是不是临界点
@@ -315,7 +313,7 @@
             // }
             this.x = x;
             this.y = y;
-
+            console.log(this.x, this.y)
             if (this.indicators) {
                 for (var i = this.indicators.length; i--;) {
                     this.indicators[i].updatePosition();
@@ -355,7 +353,6 @@
 
             // 重置 滚条距离, 更改自定义 最小距
             this.minScrollY = this.options.topOffset || 0;
-
             this.maxScrollX = this.wrapperWidth - this.scrollerWidth;
             this.maxScrollY = Math.min(this.wrapperHeight - this.scrollerHeight, this.minScrollY);
 
@@ -373,7 +370,10 @@
                 this.scrollerHeight = this.wrapperHeight;
             }
             this.endTime = 0;
+
+            this._fire('refresh')
             this.resetPosition()
+
         },
         // 注册自定义事件
         on: function (type, fn) {
@@ -470,19 +470,28 @@
             if (this.options.scrollY) {
                 var el = Indicator.createDefaultScrollbar('v');
                 this.wrapper.appendChild(el)
-                this.indicators.push(new Indicator(this, el))
+                this.indicators.push(new Indicator(this, {
+                    'el': el
+                }))
             }
             if (this.options.scrollX) {
                 var el = Indicator.createDefaultScrollbar('h');
                 this.wrapper.appendChild(el);
-                this.indicators.push(new Indicator(this, el))
+                this.indicators.push(new Indicator(this, {
+                    'el': el
+                }))
             }
+            this.on('refresh', function () {
+                for (var i = this.indicators.length; i--;) {
+                    this.indicators[i].refresh.call(this.indicators[i])
+                }
+            })
         }
     }
 
     var Indicator = (function () {
         function Indicator(scroller, options) {
-            this.wrapper = options;
+            this.wrapper = options.el;
             this.wrapperStyle = this.wrapper.style;
             this.indicator = this.wrapper.children[0];
             this.indicatorStyle = this.indicator.style;
@@ -498,11 +507,9 @@
             if (direction == 'v') {
                 scrollbar.className = 'MScrollVerticalBar';
                 scrollbar.style.cssText += ';width: 5px;bottom: 2px;top: 2px;right: 1px;overflow: hidden';
-                indicator.style.cssText += ';width: 100%;height: 30%'
+                indicator.style.cssText += ';width: 100%;'
             }
-
             scrollbar.appendChild(indicator);
-
             return scrollbar;
         }
         return Indicator;
@@ -510,13 +517,22 @@
 
     Indicator.prototype = {
         constructor: Indicator,
+        refresh: function () {
+            this.wrapperHeight = this.wrapper.clientHeight;
+            // 设置 滚条跳高度
+            this.indicatorHeight = this.wrapperHeight * this.wrapperHeight / (this.scroller.scrollerHeight || this.wrapperHeight || 1);
+            this.indicatorStyle.height = this.indicatorHeight + 'px';
+            console.log(this.scroller.hasVerticalScroll)
+            // 计算 相对比例，相对于与滑动容器缩放比
+            this.maxPosY = this.wrapperHeight - this.indicatorHeight;
+            this.sizeRatioY = Math.min(this.maxPosY / (this.scroller.maxScrollY || 1), 1);
+            this.updatePosition();
+        },
         updatePosition: function () {
-            var x = Math.round(this.scroller.x) || 0,
-                y = Math.round(this.scroller.y) || 0;
-
+            var x = Math.round(this.sizeRatioX * this.scroller.x) || 0,
+                y = Math.round(this.sizeRatioY * this.scroller.y) || 0;
             this.x = x;
             this.y = y;
-            console.log('indicator: ' + y)
             this.indicatorStyle[utils.style.transform] = 'translate(' + x + 'px,' + y + 'px)' + this.scroller.translateZ;
         }
     }

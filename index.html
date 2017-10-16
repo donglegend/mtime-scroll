@@ -135,7 +135,7 @@
                 <li>8</li>
                 <li>9</li>
                 <li>10</li>
-                <!-- <li>11</li>
+                <li>11</li>
                 <li>12</li>
                 <li>13</li>
                 <li>14</li>
@@ -144,7 +144,7 @@
                 <li>17</li>
                 <li>18</li>
                 <li>19</li>
-                <li>20</li> -->
+                <li>20</li>
 
             </ul>
             <div class="up"></div>
@@ -169,60 +169,61 @@
         var elList = document.querySelector('#list')
         var timer = null;
         var myScroll = new MScroll('#stage', {
-            topOffset: -elDown.clientHeight
+            topOffset: 0
         })
+        // -elDown.clientHeight
 
-        // myScroll.on('scrollStart', function () {
-        //     clearTimeout(timer)
-        // })
-        // myScroll.on('scroll', function () {
-        //     if (this.y > 5) {
-        //         this.minScrollY = 0;
-        //         elDown.className = 'down loosen'
-        //     } else if (this.y > this.minScrollY && this.y < 5) {
-        //         elDown.className = 'down drag'
-        //     } else if (this.y > (this.maxScrollY + 5)) {
-        //         elUp.className = 'up drag'
-        //     } else if (this.y < (this.maxScrollY - 5)) {
-        //         elUp.className = 'up loosen'
-        //     }
-        // })
-        // myScroll.on('scrollEnd', function () {
-        //     var self = this;
-        //     if (elDown.className.indexOf('loosen') > -1) {
-        //         console.log('刷新加载')
-        //         elDown.className = 'down loading'
-        //         timer = setTimeout(function () {
-        //             elList.innerHTML = createHtml() + elList.innerHTML
-        //             elDown.className = 'down drag'
-        //             elUp.className = 'up drag'
-        //             self.refresh();
-        //         }, 800)
-        //     } else if (elUp.className.indexOf('loosen') > -1) {
-        //         console.log('更多加载')
-        //         elUp.className = 'up loading'
-        //         timer = setTimeout(function () {
-        //             elList.innerHTML += createHtml()
-        //             elDown.className = 'down drag'
-        //             elUp.className = 'up drag'
-        //             self.refresh();
-        //         }, 800)
-        //     } else if (this.y > this.maxScrollY - 100) {
-        //         console.log('自动加载')
-        //         elUp.className = 'up loading'
-        //         timer = setTimeout(function () {
-        //             elList.innerHTML += createHtml()
-        //             elDown.className = 'down drag'
-        //             elUp.className = 'up drag'
-        //             self.refresh();
-        //         }, 2000)
-        //     } else {
-        //         elDown.className = 'down drag'
-        //         elUp.className = 'up drag'
-        //         self.refresh();
-        //     }
+        myScroll.on('scrollStart', function () {
+            clearTimeout(timer)
+        })
+        myScroll.on('scroll', function () {
+            if (this.y > 5) {
+                this.minScrollY = 0;
+                elDown.className = 'down loosen'
+            } else if (this.y > this.minScrollY && this.y < 5) {
+                elDown.className = 'down drag'
+            } else if (this.y > (this.maxScrollY + 5)) {
+                elUp.className = 'up drag'
+            } else if (this.y < (this.maxScrollY - 5)) {
+                elUp.className = 'up loosen'
+            }
+        })
+        myScroll.on('scrollEnd', function () {
+            var self = this;
+            if (elDown.className.indexOf('loosen') > -1) {
+                console.log('刷新加载')
+                elDown.className = 'down loading'
+                timer = setTimeout(function () {
+                    elList.innerHTML = createHtml() + elList.innerHTML
+                    elDown.className = 'down drag'
+                    elUp.className = 'up drag'
+                    self.refresh();
+                }, 800)
+            } else if (elUp.className.indexOf('loosen') > -1) {
+                console.log('更多加载')
+                elUp.className = 'up loading'
+                timer = setTimeout(function () {
+                    elList.innerHTML += createHtml()
+                    elDown.className = 'down drag'
+                    elUp.className = 'up drag'
+                    self.refresh();
+                }, 800)
+            } else if (this.y > this.maxScrollY - 100) {
+                console.log('自动加载')
+                elUp.className = 'up loading'
+                timer = setTimeout(function () {
+                    elList.innerHTML += createHtml()
+                    elDown.className = 'down drag'
+                    elUp.className = 'up drag'
+                    self.refresh();
+                }, 2000)
+            } else {
+                elDown.className = 'down drag'
+                elUp.className = 'up drag'
+                self.refresh();
+            }
 
-        // })
+        })
 
         function createHtml() {
             var html = ''
