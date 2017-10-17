@@ -38,5 +38,9 @@ enabled: true 滑动总开关
 
 ```
 
-
-注册自定义钩子函数:
+## 注册自定义钩子函数:
+```
+myScroll.on('scrollStart', function (){})
+myScroll.on('scroll', function (){})
+myScroll.on('scrollEnd', function (){})
+```
