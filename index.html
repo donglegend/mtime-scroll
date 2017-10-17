@@ -5,12 +5,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Document</title>
+    <title>myScroll</title>
     <style>
         * {
             padding: 0;
             margin: 0;
             box-sizing: border-box;
+        }
+
+        #__vconsole {
+            display: none;
         }
 
         html {
@@ -27,6 +31,7 @@
             line-height: 60px;
             transition: all .3s;
             background: #ccc;
+            transition: all .3s;
         }
 
         .down::after,
@@ -36,10 +41,12 @@
             top: 0;
             right: 0;
             bottom: 0;
+            transition: all .3s;
         }
 
         .down {
             top: 0;
+            color: #fff;
         }
 
         .up {
@@ -47,14 +54,17 @@
         }
 
         .down.loading::after {
+            background: blue;
             content: '正在加载...'
         }
 
         .down.drag::after {
+            background: red;
             content: '下拉刷新'
         }
 
         .down.loosen::after {
+            background: green;
             content: '松开加载'
         }
 
@@ -73,7 +83,7 @@
         #stage {
             position: relative;
             width: 300px;
-            height: 80vh;
+            height: 400px;
             background: #ccc;
             margin: 0px auto;
             overflow: hidden;
@@ -112,9 +122,6 @@
             padding: 8px;
             background: #efefef;
             margin-bottom: 2px;
-            /* height: 2000px;
-            background: url(./test.jpg) center top;
-            background-size: 100%; */
         }
     </style>
 </head>
@@ -135,6 +142,26 @@
                 <li>8</li>
                 <li>9</li>
                 <li>10</li>
+                <!-- <li>11</li>
+                <li>12</li>
+                <li>13</li>
+                <li>14</li>
+                <li>15</li>
+                <li>16</li>
+                <li>17</li>
+                <li>18</li>
+                <li>19</li>
+                <li>20</li>
+                <li>1</li>
+                <li>2</li>
+                <li>3</li>
+                <li>4</li>
+                <li>5</li>
+                <li>6</li>
+                <li>7</li>
+                <li>8</li>
+                <li>9</li>
+                <li>10</li>
                 <li>11</li>
                 <li>12</li>
                 <li>13</li>
@@ -145,22 +172,40 @@
                 <li>18</li>
                 <li>19</li>
                 <li>20</li>
+                <li>1</li>
+                <li>2</li>
+                <li>3</li>
+                <li>4</li>
+                <li>5</li>
+                <li>6</li>
+                <li>7</li>
+                <li>8</li>
+                <li>9</li>
+                <li>10</li>
+                <li>11</li>
+                <li>12</li>
+                <li>13</li>
+                <li>14</li>
+                <li>15</li>
+                <li>16</li>
+                <li>17</li>
+                <li>18</li>
+                <li>19</li>
+                <li>20</li> -->
 
             </ul>
             <div class="up"></div>
         </div>
     </div>
-    <script src="./vs.js"></script>
     <script>
-        var vConsole = new VConsole();
-        document.addEventListener("touchmove", function (e) {
-            e && e.preventDefault()
-        }, {
-            capture: false,
-            passive: false
-        });
+        // var vConsole = new VConsole();
+        // document.addEventListener("touchmove", function (e) {
+        //     e && e.preventDefault()
+        // }, {
+        //     capture: false,
+        //     passive: false
+        // });
     </script>
-    <script src="./utils.js"></script>
     <script src="./index.js"></script>
     <script>
         var listIndex = 11;
@@ -169,8 +214,23 @@
         var elList = document.querySelector('#list')
         var timer = null;
         var myScroll = new MScroll('#stage', {
-            topOffset: 0
+            topOffset: -elDown.clientHeight,
+            bounceTime: 300,
+            isUseAnimated: false,
+            deceleration: 0.0006
         })
+
+
+        // myScroll.on('scroll', function () {
+        //     // console.log(this.directionY)
+        //     // console.log(this.x, this.y)
+        // })
+
+        // myScroll.on('scrollEnd', function () {
+
+        // })
+
+
         // -elDown.clientHeight
 
         myScroll.on('scrollStart', function () {
@@ -208,7 +268,7 @@
                     elUp.className = 'up drag'
                     self.refresh();
                 }, 800)
-            } else if (this.y > this.maxScrollY - 100) {
+            } else if (this.y < this.maxScrollY + 100) {
                 console.log('自动加载')
                 elUp.className = 'up loading'
                 timer = setTimeout(function () {
@@ -227,7 +287,7 @@
 
         function createHtml() {
             var html = ''
-            var num = 30;
+            var num = 10;
             while (num) {
                 html += '<li>' + listIndex++ + '</li>'
                 num--;

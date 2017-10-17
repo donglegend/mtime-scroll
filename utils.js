@@ -50,7 +50,7 @@ var utils = (function () {
             speed = Math.abs(distance) / time,
             destination,
             duration;
-        deceleration = deceleration === undefined ? 0.0008 : deceleration;
+        deceleration = deceleration === undefined ? 0.0006 : deceleration;
 
         destination = current + (speed * speed) / (2 * deceleration) * (distance < 0 ? -1 : 1);
         duration = speed / deceleration;

@@ -1,4 +1,13 @@
 (function (window, document) {
+    var rAF = window.requestAnimationFrame ||
+        window.webkitRequestAnimationFrame ||
+        window.mozRequestAnimationFrame ||
+        window.oRequestAnimationFrame ||
+        window.msRequestAnimationFrame ||
+        function (callback) {
+            window.setTimeout(callback, 1000 / 60);
+        };
+
     var MScroll = (function () {
         function MScroll(el, options) {
             this.wrapper = typeof el == 'string' ? document.querySelector(el) : el;
@@ -25,6 +34,7 @@
 
                 // 阻力系数，到达临界点 拖动阻力
                 dragForce: 3,
+                deceleration: 0.0006,
 
                 // 启用css3 过度
                 useTransition: true,
@@ -48,6 +58,10 @@
             this.options.useTransition = utils.hasTransition && this.options.useTransition;
             this.options.useTransform = utils.hasTransform && this.options.useTransform;
 
+
+            if (this.options.isUseAnimated) {
+                this.options.useTransition = false
+            }
             // defaults
             this.x = 0;
             this.y = 0;
@@ -61,6 +75,272 @@
         }
         return MScroll
     })();
+
+
+    var utils = (function () {
+        var me = {};
+        var _elementStyle = document.createElement('div').style;
+        var _vendor = (function () {
+            var vendors = ['t', 'webkitT', 'MozT', 'msT', 'OT'],
+                transform,
+                i = 0,
+                l = vendors.length;
+
+            for (; i < l; i++) {
+                transform = vendors[i] + 'ransform';
+                if (transform in _elementStyle) return vendors[i].substr(0, vendors[i].length - 1);
+            }
+
+            return false;
+        })();
+
+        function _prefixStyle(style) {
+            if (_vendor === false) return false;
+            if (_vendor === '') return style;
+            return _vendor + style.charAt(0).toUpperCase() + style.substr(1);
+        }
+
+        me.getTime = Date.now || function getTime() {
+            return new Date().getTime();
+        };
+
+        me.extend = function (target, obj) {
+            for (var i in obj) {
+                target[i] = obj[i];
+            }
+        };
+
+        me.addEvent = function (el, type, fn, capture) {
+            el.addEventListener(type, fn, !!capture);
+        };
+
+        me.removeEvent = function (el, type, fn, capture) {
+            el.removeEventListener(type, fn, !!capture);
+        };
+
+        me.prefixPointerEvent = function (pointerEvent) {
+            return window.MSPointerEvent ?
+                'MSPointer' + pointerEvent.charAt(7).toUpperCase() + pointerEvent.substr(8) :
+                pointerEvent;
+        };
+
+        me.momentum = function (current, start, time, lowerMargin, wrapperSize, deceleration) {
+            var distance = current - start,
+                speed = Math.abs(distance) / time,
+                destination,
+                duration;
+            deceleration = deceleration === undefined ? 0.0006 : deceleration;
+
+            destination = current + (speed * speed) / (2 * deceleration) * (distance < 0 ? -1 : 1);
+            duration = speed / deceleration;
+
+            if (destination < lowerMargin) {
+                destination = wrapperSize ? lowerMargin - Math.min(wrapperSize / 2.5 * (speed / 8), wrapperSize / 3) : lowerMargin;
+                distance = Math.abs(destination - current);
+                duration = distance / speed;
+            } else if (destination > 0) {
+                destination = wrapperSize ? Math.min(wrapperSize / 2.5 * (speed / 8), wrapperSize / 3) : 0;
+                distance = Math.abs(current) + destination;
+                duration = distance / speed;
+            }
+
+            return {
+                destination: Math.round(destination),
+                duration: duration
+            };
+        };
+
+        var _transform = _prefixStyle('transform');
+
+        me.extend(me, {
+            hasTransform: _transform !== false,
+            hasPerspective: _prefixStyle('perspective') in _elementStyle,
+            hasTouch: 'ontouchstart' in window,
+            hasPointer: !!(window.PointerEvent || window.MSPointerEvent), // IE10 is prefixed
+            hasTransition: _prefixStyle('transition') in _elementStyle
+        });
+
+        me.isBadAndroid = (function () {
+            var appVersion = window.navigator.appVersion;
+            // Android browser is not a chrome browser.
+            if (/Android/.test(appVersion) && !(/Chrome\/\d/.test(appVersion))) {
+                var safariVersion = appVersion.match(/Safari\/(\d+.\d)/);
+                if (safariVersion && typeof safariVersion === "object" && safariVersion.length >= 2) {
+                    return parseFloat(safariVersion[1]) < 535.19;
+                } else {
+                    return true;
+                }
+            } else {
+                return false;
+            }
+        })();
+
+        me.extend(me.style = {}, {
+            transform: _transform,
+            transitionTimingFunction: _prefixStyle('transitionTimingFunction'),
+            transitionDuration: _prefixStyle('transitionDuration'),
+            transitionDelay: _prefixStyle('transitionDelay'),
+            transformOrigin: _prefixStyle('transformOrigin'),
+            touchAction: _prefixStyle('touchAction')
+        });
+
+        me.hasClass = function (e, c) {
+            var re = new RegExp("(^|\\s)" + c + "(\\s|$)");
+            return re.test(e.className);
+        };
+
+        me.addClass = function (e, c) {
+            if (me.hasClass(e, c)) {
+                return;
+            }
+
+            var newclass = e.className.split(' ');
+            newclass.push(c);
+            e.className = newclass.join(' ');
+        };
+
+        me.removeClass = function (e, c) {
+            if (!me.hasClass(e, c)) {
+                return;
+            }
+
+            var re = new RegExp("(^|\\s)" + c + "(\\s|$)", 'g');
+            e.className = e.className.replace(re, ' ');
+        };
+
+        me.offset = function (el) {
+            var left = -el.offsetLeft,
+                top = -el.offsetTop;
+
+            // jshint -W084
+            while (el = el.offsetParent) {
+                left -= el.offsetLeft;
+                top -= el.offsetTop;
+            }
+            // jshint +W084
+
+            return {
+                left: left,
+                top: top
+            };
+        };
+
+        me.preventDefaultException = function (el, exceptions) {
+            for (var i in exceptions) {
+                if (exceptions[i].test(el[i])) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        me.extend(me.eventType = {}, {
+            touchstart: 1,
+            touchmove: 1,
+            touchend: 1,
+
+            mousedown: 2,
+            mousemove: 2,
+            mouseup: 2,
+
+            pointerdown: 3,
+            pointermove: 3,
+            pointerup: 3,
+
+            MSPointerDown: 3,
+            MSPointerMove: 3,
+            MSPointerUp: 3
+        });
+
+        me.extend(me.ease = {}, {
+            quadratic: {
+                style: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                fn: function (k) {
+                    return k * (2 - k);
+                }
+            },
+            circular: {
+                style: 'cubic-bezier(0.1, 0.57, 0.1, 1)', // Not properly "circular" but this looks better, it should be (0.075, 0.82, 0.165, 1)
+                fn: function (k) {
+                    return Math.sqrt(1 - (--k * k));
+                }
+            },
+            back: {
+                style: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                fn: function (k) {
+                    var b = 4;
+                    return (k = k - 1) * k * ((b + 1) * k + b) + 1;
+                }
+            },
+            bounce: {
+                style: '',
+                fn: function (k) {
+                    if ((k /= 1) < (1 / 2.75)) {
+                        return 7.5625 * k * k;
+                    } else if (k < (2 / 2.75)) {
+                        return 7.5625 * (k -= (1.5 / 2.75)) * k + 0.75;
+                    } else if (k < (2.5 / 2.75)) {
+                        return 7.5625 * (k -= (2.25 / 2.75)) * k + 0.9375;
+                    } else {
+                        return 7.5625 * (k -= (2.625 / 2.75)) * k + 0.984375;
+                    }
+                }
+            },
+            elastic: {
+                style: '',
+                fn: function (k) {
+                    var f = 0.22,
+                        e = 0.4;
+
+                    if (k === 0) {
+                        return 0;
+                    }
+                    if (k == 1) {
+                        return 1;
+                    }
+
+                    return (e * Math.pow(2, -10 * k) * Math.sin((k - f / 4) * (2 * Math.PI) / f) + 1);
+                }
+            }
+        });
+
+        me.getTouchAction = function (eventPassthrough, addPinch) {
+            var touchAction = 'none';
+            if (eventPassthrough === 'vertical') {
+                touchAction = 'pan-y';
+            } else if (eventPassthrough === 'horizontal') {
+                touchAction = 'pan-x';
+            }
+            if (addPinch && touchAction != 'none') {
+                // add pinch-zoom support if the browser supports it, but if not (eg. Chrome <55) do nothing
+                touchAction += ' pinch-zoom';
+            }
+            return touchAction;
+        };
+
+        me.getRect = function (el) {
+            if (el instanceof SVGElement) {
+                var rect = el.getBoundingClientRect();
+                return {
+                    top: rect.top,
+                    left: rect.left,
+                    width: rect.width,
+                    height: rect.height
+                };
+            } else {
+                return {
+                    top: el.offsetTop,
+                    left: el.offsetLeft,
+                    width: el.offsetWidth,
+                    height: el.offsetHeight
+                };
+            }
+        };
+
+        return me;
+    })();
+
     MScroll.prototype = {
         version: '0.0.1',
         constructor: MScroll,
@@ -85,6 +365,9 @@
             // 计算偏移量
             this.distX = 0;
             this.distY = 0;
+            // 记录方向
+            this.directionX = 0;
+            this.directionY = 0;
             // 记录开始 时间
             this.startTime = utils.getTime();
 
@@ -101,6 +384,9 @@
                 pos = this.getComputedPosition();
                 this._translate(Math.round(pos.x), Math.round(pos.y));
                 this._fire('scrollEnd');
+            } else if (!this.options.useTransition && this.isAnimating) {
+                this.isAnimating = false;
+                this._fire('scrollEnd')
             }
 
             // 初始 transform 偏移量
@@ -161,6 +447,10 @@
                 newY = this.options.bounce ? this.y + deltaY / this.options.dragForce : newY > this.minScrollY ? this.minScrollY : this.maxScrollY;
             }
 
+            // 设置方向
+            this.directionX = deltaX > 0 ? -1 : deltaX < 0 ? 1 : 0;
+            this.directionY = deltaY > 0 ? -1 : deltaY < 0 ? 1 : 0;
+
             // 开始 滚动，这里可以加入钩子函数
             if (!this.moved) {
                 this._fire('scrollStart')
@@ -173,6 +463,7 @@
                 this.startTime = timestamp;
                 this.startX = this.x;
                 this.startY = this.y;
+                this._fire('scroll')
             }
             this._fire('scroll')
         },
@@ -228,7 +519,7 @@
                 newY = momentumY.destination;
                 time = Math.max(momentumX.duration, momentumY.duration);
                 // 开启过渡
-                this.isInTransition = 1;
+                // this.isInTransition = 1;
             }
 
             if (newX != this.x || newY != this.y) {
@@ -285,11 +576,15 @@
 
             this.isInTransition = this.options.useTransition && time > 0;
             var transitionType = this.options.useTransition && easing.style;
-            if (transitionType) {
-                this._transitionTimingFunction(easing.style);
-                this._transitionTime(time);
+            if (!time || transitionType) {
+                if (transitionType) {
+                    this._transitionTimingFunction(easing.style);
+                    this._transitionTime(time);
+                }
+                this._translate(x, y);
+            } else {
+                this._animate(x, y, time, easing.fn);
             }
-            this._translate(x, y);
         },
         _transitionTime: function (time) {
             if (!this.options.useTransition) {
@@ -302,9 +597,20 @@
             }
             this.scrollerStyle[durationProp] = time + 'ms';
 
+            if (this.indicators) {
+                for (var i = this.indicators.length; i--;) {
+                    this.indicators[i].transitionTime(time);
+                }
+            }
+
         },
         _transitionTimingFunction: function (easing) {
             this.scrollerStyle[utils.style.transitionTimingFunction] = easing;
+            if (this.indicators) {
+                for (var i = this.indicators.length; i--;) {
+                    this.indicators[i].transitionTimingFunction(easing);
+                }
+            }
         },
         _translate: function (x, y) {
             this.scrollerStyle[utils.style.transform] = 'translate(' + x + 'px,' + y + 'px)' + this.translateZ;
@@ -313,12 +619,48 @@
             // }
             this.x = x;
             this.y = y;
-            console.log(this.x, this.y)
             if (this.indicators) {
                 for (var i = this.indicators.length; i--;) {
                     this.indicators[i].updatePosition();
                 }
             }
+        },
+        _animate: function (destX, destY, duration, easingFn) {
+            var self = this,
+                startX = this.x,
+                startY = this.y,
+                startTime = utils.getTime(),
+                destTime = startTime + duration;
+
+            function step() {
+                var now = utils.getTime(),
+                    newX, newY,
+                    easing;
+
+                if (now >= destTime) {
+                    self.isAnimating = false;
+                    self._translate(destX, destY);
+
+                    if (!self.resetPosition(self.options.bounceTime)) {
+                        self._fire('scrollEnd');
+                    }
+
+                    return;
+                }
+
+                now = (now - startTime) / duration;
+                easing = easingFn(now);
+                newX = (destX - startX) * easing + startX;
+                newY = (destY - startY) * easing + startY;
+                self._translate(newX, newY);
+
+                if (self.isAnimating) {
+                    rAF(step);
+                }
+                self._fire('scroll')
+            }
+            this.isAnimating = true;
+            step();
         },
         getComputedPosition: function () {
             var matrix = window.getComputedStyle(this.scroller, null),
@@ -356,9 +698,9 @@
             this.maxScrollX = this.wrapperWidth - this.scrollerWidth;
             this.maxScrollY = Math.min(this.wrapperHeight - this.scrollerHeight, this.minScrollY);
 
-            // 是否有滚动
+            // 是否有滚动, 竖直方向 预留 topOffSet
             this.hasHorizontalScroll = this.options.scrollX && this.maxScrollX < 0;
-            this.hasVerticalScroll = this.options.scrollY && this.maxScrollY < 0;
+            this.hasVerticalScroll = this.options.scrollY && this.maxScrollY < this.options.topOffset;
 
             if (!this.hasHorizontalScroll) {
                 this.maxScrollX = 0;
@@ -370,6 +712,9 @@
                 this.scrollerHeight = this.wrapperHeight;
             }
             this.endTime = 0;
+
+            this.directionX = 0;
+            this.directionY = 0;
 
             this._fire('refresh')
             this.resetPosition()
@@ -471,14 +816,16 @@
                 var el = Indicator.createDefaultScrollbar('v');
                 this.wrapper.appendChild(el)
                 this.indicators.push(new Indicator(this, {
-                    'el': el
+                    el: el,
+                    directionY: true
                 }))
             }
             if (this.options.scrollX) {
                 var el = Indicator.createDefaultScrollbar('h');
                 this.wrapper.appendChild(el);
                 this.indicators.push(new Indicator(this, {
-                    'el': el
+                    el: el,
+                    directionX: true
                 }))
             }
             this.on('refresh', function () {
@@ -496,6 +843,14 @@
             this.indicator = this.wrapper.children[0];
             this.indicatorStyle = this.indicator.style;
             this.scroller = scroller;
+
+            this.options = {
+                directionY: false,
+                directionX: false
+            }
+            for (var i in options) {
+                this.options[i] = options[i]
+            }
         }
         Indicator.createDefaultScrollbar = function (direction) {
             var scrollbar = document.createElement('div'),
@@ -509,6 +864,12 @@
                 scrollbar.style.cssText += ';width: 5px;bottom: 2px;top: 2px;right: 1px;overflow: hidden';
                 indicator.style.cssText += ';width: 100%;'
             }
+            if (direction == 'h') {
+                scrollbar.className = 'MScrollHorizontalBar';
+                scrollbar.style.cssText += ';height: 5px;bottom: 0px;left: 2px;right: 2px;overflow: hidden';
+                indicator.style.cssText += ';height: 100%;'
+            }
+
             scrollbar.appendChild(indicator);
             return scrollbar;
         }
@@ -518,22 +879,41 @@
     Indicator.prototype = {
         constructor: Indicator,
         refresh: function () {
+            if (this.options.directionY && !this.scroller.hasVerticalScroll) {
+                this.indicatorStyle.display = 'none'
+            }
+            if (this.options.directionX && !this.scroller.hasHorizontalScroll) {
+                this.indicatorStyle.display = 'none'
+            }
             this.wrapperHeight = this.wrapper.clientHeight;
+            // 如果scroll容器顶部多出的 topOffSet，那么滚动条需要做一个容差处理
+            this.topOffset = this.scroller.options.topOffset || 0;
             // 设置 滚条跳高度
-            this.indicatorHeight = this.wrapperHeight * this.wrapperHeight / (this.scroller.scrollerHeight || this.wrapperHeight || 1);
+            this.indicatorHeight = this.wrapperHeight * this.wrapperHeight / (this.scroller.scrollerHeight + this.topOffset || this.wrapperHeight || 1);
             this.indicatorStyle.height = this.indicatorHeight + 'px';
-            console.log(this.scroller.hasVerticalScroll)
             // 计算 相对比例，相对于与滑动容器缩放比
             this.maxPosY = this.wrapperHeight - this.indicatorHeight;
-            this.sizeRatioY = Math.min(this.maxPosY / (this.scroller.maxScrollY || 1), 1);
+            this.sizeRatioY = Math.min(this.maxPosY / (this.scroller.maxScrollY - this.topOffset || 1), 1);
             this.updatePosition();
         },
         updatePosition: function () {
             var x = Math.round(this.sizeRatioX * this.scroller.x) || 0,
-                y = Math.round(this.sizeRatioY * this.scroller.y) || 0;
+                y = Math.round(this.sizeRatioY * (this.scroller.y - this.topOffset)) || 0;
+
             this.x = x;
             this.y = y;
             this.indicatorStyle[utils.style.transform] = 'translate(' + x + 'px,' + y + 'px)' + this.scroller.translateZ;
+        },
+        transitionTimingFunction: function (easing) {
+            this.indicatorStyle[utils.style.transitionTimingFunction] = easing;
+        },
+        transitionTime: function (time) {
+            time = time || 0;
+            var durationProp = utils.style.transitionDuration;
+            if (!durationProp) {
+                return;
+            }
+            this.indicatorStyle[durationProp] = time + 'ms';
         }
     }
 
