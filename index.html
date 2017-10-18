@@ -237,6 +237,7 @@
             clearTimeout(timer)
         })
         myScroll.on('scroll', function () {
+            console.log(this.directionY)
             if (this.y > 5) {
                 this.minScrollY = 0;
                 elDown.className = 'down loosen'
