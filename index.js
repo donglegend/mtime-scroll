@@ -1,4 +1,7 @@
-(function (window, document) {
+(function () {
+    if (typeof window === 'undefined') {
+        return {};
+    }
     var rAF = window.requestAnimationFrame ||
         window.webkitRequestAnimationFrame ||
         window.mozRequestAnimationFrame ||
@@ -309,7 +312,8 @@
                 resizePolling: 60,
 
                 // 是否需要 滚动条
-                scrollbars: true,
+                scrollbars: false,
+                scrollbarsFade: true,
 
                 // 事件监听对象
                 bindToWrapper: typeof window.onmousedown === "undefined"
@@ -381,7 +385,7 @@
             if (this.options.useTransition && this.isInTransition) {
                 this._transitionTime();
                 this.isInTransition = false;
-                pos = this.getComputedPosition();
+                var pos = this.getComputedPosition();
                 this._translate(Math.round(pos.x), Math.round(pos.y));
                 this._fire('scrollEnd');
             } else if (!this.options.useTransition && this.isAnimating) {
@@ -543,10 +547,10 @@
             }
         },
         _resize: function () {
-            var that = this;
+            var self = this;
             clearTimeout(this.resizeTimeout);
             this.resizeTimeout = setTimeout(function () {
-                that.refresh();
+                self.refresh();
             }, this.options.resizePolling);
         },
         // 是否到达临界点，重置位置
@@ -688,6 +692,9 @@
             var wrapperRect = utils.getRect(this.wrapper);
             this.wrapperWidth = wrapperRect.width;
             this.wrapperHeight = wrapperRect.height;
+
+            this.wrapper.style['overflow'] = 'hidden';
+            this.wrapper.style['touchAction'] = 'none';
             // 重置 视图
             var rect = utils.getRect(this.scroller);
             this.scrollerWidth = rect.width;
@@ -811,6 +818,7 @@
             }
         },
         _initIndicators: function () {
+            var self = this;
             this.indicators = [];
             if (this.options.scrollY) {
                 var el = Indicator.createDefaultScrollbar('v');
@@ -833,6 +841,24 @@
                     this.indicators[i].refresh.call(this.indicators[i])
                 }
             })
+            if (this.options.scrollbarsFade) {
+                this.on('scrollStart', function () {
+                    mapIndicators(function () {
+                        this.fade(1)
+                    })
+                })
+                this.on('scrollEnd', function () {
+                    mapIndicators(function () {
+                        this.fade()
+                    })
+                })
+            }
+
+            function mapIndicators(fn) {
+                for (var i = self.indicators.length; i--;) {
+                    fn.call(self.indicators[i])
+                }
+            }
         }
     }
 
@@ -914,6 +940,20 @@
                 return;
             }
             this.indicatorStyle[durationProp] = time + 'ms';
+        },
+        fade: function (v) {
+
+            var self = this;
+
+            clearTimeout(this.fadeTimeout)
+
+            var time = v ? 250 : 500,
+                delay = v ? 0 : 300;
+            v = v ? '1' : '0'
+            this.wrapperStyle[utils.style.transitionDuration] = time + 'ms';
+            this.fadeTimeout = setTimeout(function () {
+                self.wrapperStyle.opacity = v
+            }, delay)
         }
     }
 
@@ -926,4 +966,4 @@
     } else {
         window.MScroll = MScroll;
     }
-})(window, document)
+})()

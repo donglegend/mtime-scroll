@@ -30,6 +30,7 @@ dragForce: 3 到达临界值后，滑动阻力系数，越大，阻力越大
 deceleration: 0.0006 做惯性滑动时的加速度变化量,越小 惯性越大
 
 scrollbars: true 是否需要滚动条
+scrollbarsFade: true 启动fade效果
 
 directionX: 水平方向滚动的话，向左（1）还是向右（-1）
 directionY: 垂直方向滚动的话，向上（1）还是向下（-1）
