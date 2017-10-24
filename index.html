@@ -90,6 +90,7 @@
             touch-action: none;
             transition: all .3s;
         }
+
         /* .MScrollVerticalBar {
             position: absolute;
             z-index: 9999;
@@ -207,7 +208,9 @@
         // });
     </script>
     <script src="./index.js"></script>
+    <script src="https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
     <script>
+
         var listIndex = 11;
         var elDown = document.querySelector('.down'),
             elUp = document.querySelector('.up');
@@ -221,19 +224,6 @@
             scrollbars: true,
         })
 
-
-        // myScroll.on('scroll', function () {
-        //     // console.log(this.directionY)
-        //     // console.log(this.x, this.y)
-        // })
-
-        // myScroll.on('scrollEnd', function () {
-
-        // })
-
-
-        // -elDown.clientHeight
-
         myScroll.on('scrollStart', function () {
             clearTimeout(timer)
         })
@@ -242,6 +232,7 @@
                 this.minScrollY = 0;
                 elDown.className = 'down loosen'
             } else if (this.y > this.minScrollY && this.y < 5) {
+                this.minScrollY = -elDown.clientHeight;
                 elDown.className = 'down drag'
             } else if (this.y > (this.maxScrollY + 5)) {
                 elUp.className = 'up drag'
@@ -295,6 +286,16 @@
             }
             return html
         }
+
+        // $('#list').on('click', 'li', function () {
+        //     alert($(this).text())
+        // })
+        // elList.addEventListener('touchend', function () {
+
+        // })
+        $('#list').on('touchend', 'li', function () {
+            alert($(this).text())
+        })
     </script>
 </body>
 
